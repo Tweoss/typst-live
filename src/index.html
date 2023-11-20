@@ -2,51 +2,174 @@
 <html>
 
 <head>
-    <script>
-        let connected = false;
+  <style>
+    html,
+    body,
+    div {
+      margin: 0px;
+      padding: 0px;
+      border: 0px;
+    }
 
-        function tryConnect() {
-            console.log('[tlive] - Trying to connect to the server')
+    body {
+      overflow: auto;
+    }
 
-            const ws = new WebSocket("ws://{addr}:{port}/listen");
-            ws.addEventListener('open', (_) => {
-                console.log('[tlive] - Connected to the server')
+    #page-container {
+      margin: auto;
+      transform-origin: top left;
+      width: 100%;
+    }
 
-                connected = true;
-            });
-
-            ws.addEventListener('message', (e) => {
-                console.log('[tlive] - Updating pdf')
-
-                document.getElementById("target").src += '';
-            });
-
-            ws.addEventListener('close', (_) => {
-                console.log('[tlive] - Disconnected')
-
-                connected = false;
-            });
-
-            setTimeout(() => {
-                if (connected) return;
-                tryConnect()
-            })
-        }
-
-        tryConnect();
-    </script>
-
-    <style>
-        body {
-            width: 100vw;
-            height: 100vh;
-            margin: 0;
-        }
-    </style>
+    img {
+      border: 3px solid black;
+      // border-style: inset;
+      width: 100%;
+      // padding: 30px -40px;
+      margin: 30px -40px;
+    }
+  </style>
 </head>
 
 <body>
-    <iframe id="target" src="/target.pdf" type="application/pdf" width="100%" height="100%" />
+  <div id="page-container">
+  </div>
+  <script>
+    let connected = false, pages = 0, fully_initialized = false;
+    const cont = document.getElementById("page-container");
+    let scale = get_from_local_storage("scale", 1);
+    update_container_style(scale);
+    // Because the DOM takes a while to update, we can only scroll to this position a while
+    // after the scale transform is applied.
+    setTimeout(() => {
+      window.scrollTo(get_from_local_storage("x-scroll", 0), get_from_local_storage("y-scroll", 0));
+    }, 100)
+
+    let append_img = (index) => {
+      let el = document.createElement("img");
+      el.src = `output_${index}.svg?0`;
+      cont.appendChild(el);
+    };
+
+    // Check if the svg `output_starting_index.svg` exists.
+    // Continues to scan linearly upwards, appending img elements as necessary
+    // until a request comes back with an error.
+    function guess_page_count(starting_index) {
+      fetch(`./output_${starting_index}.svg`).then(function (response) {
+        if (!response.ok) {
+          fully_initialized = true;
+          return;
+        }
+        if (document.querySelectorAll("img").length < starting_index) {
+          append_img(starting_index);
+        }
+        guess_page_count(starting_index + 1);
+      })
+    }
+
+    let update_pages = index => {
+      for (; index > pages; pages++) {
+        append_img(index);
+      }
+    };
+
+    function tryConnect() {
+      console.log('[tlive] - Trying to connect to the server')
+
+      const ws = new WebSocket("ws://{addr}:{port}/listen");
+      ws.addEventListener('open', (_) => {
+        console.log('[tlive] - Connected to the server')
+        connected = true;
+        guess_page_count(1);
+      });
+
+      ws.addEventListener('message', (e) => {
+        if (!fully_initialized) {
+          return;
+        }
+        if (e.data.startsWith("refresh:")) {
+          let index = parseInt(e.data.substring(8));
+          console.log('[tlive] - Updating image ' + index)
+          update_pages(index);
+          const target = document.querySelectorAll("img")[index - 1];
+          const next_version = parseInt(target.src.split('?')[1]) + 1
+          document.querySelectorAll("img")[index - 1].src = `output_${index}.svg?${next_version}`;
+        }
+      });
+
+      ws.addEventListener('close', (_) => {
+        console.log('[tlive] - Disconnected')
+        connected = false;
+        fully_initialized = false;
+      });
+
+      setTimeout(() => {
+        if (connected) return;
+        tryConnect()
+      }, 100)
+    }
+
+    tryConnect();
+
+
+    function update_container_style(scale) {
+      // If scroll bars are visible, we should anchor to the top left.
+      if (document.body.scrollWidth > document.body.clientWidth) {
+        cont.style.transformOrigin = `0px 0px`;
+        cont.style.margin = '0 px';
+      } else {
+        let bounds = document.body.scrollWidth;
+        cont.style.transformOrigin = `${bounds / 2}px 0px`;
+        cont.style.margin = 'auto';
+      }
+      cont.style.transform = `scale(${scale})`;
+    };
+
+    function update_local_storage(scale) {
+      window.localStorage.setItem("y-scroll", window.pageYOffset);
+      window.localStorage.setItem("x-scroll", window.pageXOffset);
+      window.localStorage.setItem("scale", scale);
+    };
+
+    function get_from_local_storage(id, default_value) {
+      let result = window.localStorage.getItem(id);
+      if (!result) {
+        return default_value;
+      }
+      result = parseFloat(result);
+      if (!result) {
+        return default_value;
+      }
+      return result;
+    };
+
+
+    document.addEventListener("scroll", (event) => {
+      if (fully_initialized && !event.metaKey) {
+        update_local_storage(scale);
+      }
+    }, {passive: true});
+
+    window.addEventListener("wheel", (event) => {
+      if (fully_initialized && event.metaKey) {
+        event.preventDefault();
+
+        let old_scale = scale;
+        let new_scale = Math.min(Math.max(old_scale * Math.exp(-event.deltaY / 400), .2), 20);
+        let scaling_factor = new_scale / old_scale - 1;
+
+        scale = new_scale;
+        // Calculate how much to scroll to keep cursor in one place.
+        let bounds = cont.getBoundingClientRect();
+        let y_offset = event.clientY - bounds.y;
+        let x_offset = event.clientX - bounds.x;
+        update_container_style(scale);
+        window.scrollBy(scaling_factor * x_offset, scaling_factor * y_offset);
+        update_local_storage(scale);
+      }
+    }, {passive: false});
+  </script>
+
 </body>
 
 </html>

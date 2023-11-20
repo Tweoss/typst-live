@@ -3,9 +3,9 @@ use axum::{
     body::Full,
     extract::{
         ws::{Message, WebSocket},
-        State, WebSocketUpgrade,
+        Path, State, WebSocketUpgrade,
     },
-    http::{header::CONTENT_TYPE, Response},
+    http::{header::CONTENT_TYPE, Response, StatusCode},
     response::{Html, IntoResponse},
 };
 use std::sync::Arc;
@@ -18,25 +18,26 @@ pub async fn root(State(state): State<Arc<ServerState>>) -> Html<String> {
         .into()
 }
 
-pub async fn target(State(state): State<Arc<ServerState>>) -> impl IntoResponse {
-    let filename = if state.args.no_recompile {
-        &state.args.filename
-    } else {
-        "output.pdf"
-    };
+pub async fn target(
+    Path(svg_file): Path<String>,
+    State(state): State<Arc<ServerState>>,
+) -> impl IntoResponse {
+    dbg!(svg_file.clone());
+    let filename = state.directory.path().join(svg_file);
 
-    let data = match fs::read(filename).await {
-        Ok(data) => data,
+    match fs::read(&filename).await {
+        Ok(data) => Response::builder()
+            .header(CONTENT_TYPE, "image/svg+xml")
+            .body(Full::from(data))
+            .expect("Failed to build response"),
         Err(err) => {
-            println!("[ERR] Failed to read `{filename}` {err:?}");
-            vec![]
+            println!("[INFO] Failed to read `{}` {err:?}", filename.display());
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Full::from("file not found"))
+                .expect("Failed to build response")
         }
-    };
-
-    Response::builder()
-        .header(CONTENT_TYPE, "application/pdf")
-        .body(Full::from(data))
-        .expect("Failed to build response")
+    }
 }
 
 pub async fn listen(
@@ -47,8 +48,10 @@ pub async fn listen(
 }
 
 async fn handler(mut socket: WebSocket, state: Arc<ServerState>) {
+    let mut receiver = state.changed.subscribe();
     loop {
-        state.changed.notified().await;
-        _ = socket.send(Message::Text("refresh".into())).await;
+        if let Ok(index) = receiver.recv().await {
+            _ = socket.send(Message::Text(format!("refresh:{index}"))).await;
+        }
     }
 }
