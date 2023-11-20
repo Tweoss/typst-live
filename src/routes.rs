@@ -22,7 +22,6 @@ pub async fn target(
     Path(svg_file): Path<String>,
     State(state): State<Arc<ServerState>>,
 ) -> impl IntoResponse {
-    dbg!(svg_file.clone());
     let filename = state.directory.path().join(svg_file);
 
     match fs::read(&filename).await {
