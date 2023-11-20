@@ -1,4 +1,20 @@
 # Typst-live
+
+This is a fork of typst-live. The original README is below. 
+
+This fork uses multiple svg output files instead of a single pdf. This enables saving scrolling and zoom
+information in browsers that do not support it (e.g. Arc, Chrome, Safari). Based off of some preliminary 
+testing, Firefox and Edge already save this information. 
+
+The typst compiler ouputs each page of a document into separate svg files and only outputs files when the 
+specific file needs to be modified. Therefore, there is no need to reload the whole pdf, so this fork only
+reloads changed svg files. This means there is no flicker, minimal delay, and (hopefully) less energy usage.
+
+One additional change is that this fork uses a tmp folder instead of the working directory for the 
+intermediate preview files.
+
+# Original README
+
 This is a simple utility to watch for changes in your [typst](https://github.com/typst/typst) file and automatically
 recompile them for live feedback. `typst-live` allows you to open a tab in your browser with typst generated pdf and have it automatically reload
 whenever your source `.typ` files are changed.
