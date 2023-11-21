@@ -13,6 +13,9 @@ reloads changed svg files. This means there is no flicker, minimal delay, and (h
 One additional change is that this fork uses a tmp folder instead of the working directory for the 
 intermediate preview files.
 
+Unfortunately, it appears that typst does not clean up pages if the page count reduces. That means
+there will be dangling extra pages if the document gets shorter.
+
 # Original README
 
 This is a simple utility to watch for changes in your [typst](https://github.com/typst/typst) file and automatically
