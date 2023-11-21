@@ -8,7 +8,11 @@ use axum::{
     http::{header::CONTENT_TYPE, Response, StatusCode},
     response::{Html, IntoResponse},
 };
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::fs;
 
 pub async fn root(State(state): State<Arc<ServerState>>) -> Html<String> {
@@ -22,7 +26,31 @@ pub async fn target(
     Path(svg_file): Path<String>,
     State(state): State<Arc<ServerState>>,
 ) -> impl IntoResponse {
-    let filename = state.directory.path().join(svg_file);
+    // Typst ouputs in the form 001.svg if there are up to 999 files.
+    // The frontend doesn't know how many files are generated, so we
+    // normalize here.
+    fn normalize(s: &str) -> Option<String> {
+        let s = s.strip_prefix("output_")?;
+        let s = s.strip_suffix(".svg")?;
+        Some(format!("output_{}.svg", s.trim_start_matches('0')))
+    }
+    let target = normalize(&svg_file).unwrap_or(svg_file);
+
+    // We search for a file with the same normalized format.
+    let filename = state
+        .directory
+        .path()
+        .read_dir()
+        .expect("Could not read directory")
+        .find_map(|f| {
+            let f = f.ok()?;
+            if normalize(&f.file_name().to_string_lossy()).as_ref() == Some(&target) {
+                Some(f.path())
+            } else {
+                None
+            }
+        })
+        .unwrap_or(state.directory.path().join(target));
 
     match fs::read(&filename).await {
         Ok(data) => Response::builder()
@@ -48,9 +76,19 @@ pub async fn listen(
 
 async fn handler(mut socket: WebSocket, state: Arc<ServerState>) {
     let mut receiver = state.changed.subscribe();
+    let mut last_update: HashMap<usize, Instant> = HashMap::new();
     loop {
+        // Implement basic debouncing per 100ms.
         if let Ok(index) = receiver.recv().await {
-            _ = socket.send(Message::Text(format!("refresh:{index}"))).await;
+            let last = last_update.insert(index, Instant::now());
+            if last.is_none()
+                || last.is_some_and(|last| {
+                    Instant::now().duration_since(last) > Duration::from_millis(10)
+                })
+            {
+                println!("[INFO] refreshing page {index}");
+                _ = socket.send(Message::Text(format!("refresh:{index}"))).await;
+            }
         }
     }
 }
