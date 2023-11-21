@@ -16,17 +16,17 @@
     }
 
     #page-container {
-      margin: auto;
       transform-origin: top left;
       width: 100%;
     }
 
+    div.image {
+      padding: 20px 20px;
+    }
+
     img {
       border: 3px solid black;
-      // border-style: inset;
       width: 100%;
-      // padding: 30px -40px;
-      margin: 30px -40px;
     }
   </style>
 </head>
@@ -36,7 +36,7 @@
   </div>
   <script>
     let connected = false, pages = 0, fully_initialized = false;
-    const cont = document.getElementById("page-container");
+    const container = document.getElementById("page-container");
     let scale = get_from_local_storage("scale", 1);
     update_container_style(scale);
     // Because the DOM takes a while to update, we can only scroll to this position a while
@@ -46,9 +46,12 @@
     }, 100)
 
     let append_img = (index) => {
+      let div = document.createElement("div");
+      div.className = 'image';
       let el = document.createElement("img");
       el.src = `output_${index}.svg?0`;
-      cont.appendChild(el);
+      div.appendChild(el);
+      container.appendChild(div);
     };
 
     // Check if the svg `output_starting_index.svg` exists.
@@ -115,14 +118,14 @@
     function update_container_style(scale) {
       // If scroll bars are visible, we should anchor to the top left.
       if (document.body.scrollWidth > document.body.clientWidth) {
-        cont.style.transformOrigin = `0px 0px`;
-        cont.style.margin = '0 px';
+        container.style.transformOrigin = `0px 0px`;
+        container.style.margin = '0 px';
       } else {
         let bounds = document.body.scrollWidth;
-        cont.style.transformOrigin = `${bounds / 2}px 0px`;
-        cont.style.margin = 'auto';
+        container.style.transformOrigin = `${bounds / 2}px 0px`;
+        container.style.margin = 'auto';
       }
-      cont.style.transform = `scale(${scale})`;
+      container.style.transform = `scale(${scale})`;
     };
 
     function update_local_storage(scale) {
@@ -160,7 +163,7 @@
 
         scale = new_scale;
         // Calculate how much to scroll to keep cursor in one place.
-        let bounds = cont.getBoundingClientRect();
+        let bounds = container.getBoundingClientRect();
         let y_offset = event.clientY - bounds.y;
         let x_offset = event.clientX - bounds.x;
         update_container_style(scale);
