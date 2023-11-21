@@ -60,6 +60,7 @@
     function guess_page_count(starting_index) {
       fetch(`./output_${starting_index}.svg`).then(function (response) {
         if (!response.ok) {
+          pages = starting_index;
           fully_initialized = true;
           return;
         }
@@ -102,6 +103,7 @@
 
       ws.addEventListener('close', (_) => {
         console.log('[tlive] - Disconnected')
+        document.body.style.backgroundColor = 'lightgray';
         connected = false;
         fully_initialized = false;
       });
