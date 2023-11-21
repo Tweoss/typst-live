@@ -20,6 +20,9 @@ struct Args {
     #[argh(positional)]
     /// specifies file to recompile when changes are made. If `--watch` is used it should be pdf file.
     filename: String,
+    #[argh(option, default = "String::from(\".\")")]
+    /// specifies the root directory for typst's file paths
+    root: String,
     #[argh(option, short = 'A', default = "String::from(\"127.0.0.1\")")]
     /// specifies the listen address. Defaults to 127.0.0.1
     address: String,

@@ -9,6 +9,8 @@ pub async fn setup_watching_typst(state: Arc<ServerState>) -> Result<Recommended
         .arg("watch")
         .arg(&state.args.filename)
         .arg(state.directory.path().join("output_{n}.svg"))
+        .arg("--root")
+        .arg(&state.args.root)
         .spawn()
     {
         Ok(child) => {
