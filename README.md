@@ -1,5 +1,9 @@
 # Typst-live
 
+`typst-preview` has the features listed below and likely has less bugs. 
+
+https://github.com/Enter-tainer/typst-preview
+
 This is a fork of typst-live. The original README is below. 
 
 This fork uses multiple svg output files instead of a single pdf. This enables saving scrolling and zoom
